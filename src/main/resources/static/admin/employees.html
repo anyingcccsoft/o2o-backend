@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>员工管理 - 外卖订餐管理端</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="page-title" id="pageTitle">员工管理</span>
+      <div class="topbar-right">
+        <span class="admin-name" id="adminName"></span>
+        <button type="button" class="btn btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="card">
+        <div class="card-header">
+          <h3>员工列表</h3>
+          <button type="button" class="btn btn-primary" id="addBtn">+ 新增员工</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>ID</th>
+              <th>用户名</th>
+              <th>姓名</th>
+              <th>手机号</th>
+              <th>状态</th>
+              <th>启用/禁用</th>
+              <th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="tableBody">
+            <tr><td colspan="7" class="empty-cell">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑员工弹窗 -->
+<div class="modal-mask" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">新增员工</h3>
+      <button type="button" class="modal-close" data-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editForm" autocomplete="off">
+        <div class="form-item">
+          <label><span class="required">*</span>用户名</label>
+          <input type="text" id="fUsername" class="form-input" placeholder="登录用户名" maxlength="50">
+        </div>
+        <div class="form-item" id="passwordItem">
+          <label><span class="required">*</span>密码</label>
+          <input type="password" id="fPassword" class="form-input" placeholder="登录密码" maxlength="50">
+          <div class="form-tip" id="passwordTip" style="display:none;">编辑时留空表示不修改密码</div>
+        </div>
+        <div class="form-item">
+          <label><span class="required">*</span>姓名</label>
+          <input type="text" id="fRealName" class="form-input" placeholder="真实姓名" maxlength="20">
+        </div>
+        <div class="form-item">
+          <label>手机号</label>
+          <input type="text" id="fPhone" class="form-input" placeholder="联系电话" maxlength="20">
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" data-close>取消</button>
+      <button type="button" class="btn btn-primary" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin-common.js"></script>
+<script>
+  (function () {
+    var state = { page: 1, pageSize: 10 };
+    var editingId = null; // null=新增，否则为编辑的员工 id
+
+    initAdminPage('employees', '员工管理').then(function () {
+      loadList();
+    }).catch(function () {});
+
+    bindModalClose();
+
+    /** 加载员工分页列表 */
+    function loadList() {
+      apiGet('/api/admin/employees?page=' + state.page + '&pageSize=' + state.pageSize)
+        .then(function (pr) {
+          renderTable(pr.records);
+          renderPagination('pagination', pr.total, pr.page, pr.pageSize, function (p) {
+            state.page = p;
+            loadList();
+          });
+        }).catch(function () {});
+    }
+
+    /** 渲染表格 */
+    function renderTable(records) {
+      var tbody = document.getElementById('tableBody');
+      if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">暂无员工数据</td></tr>';
+        return;
+      }
+      tbody.innerHTML = records.map(function (e) {
+        var statusBadge = e.status === 1
+          ? '<span class="badge badge-success">启用</span>'
+          : '<span class="badge badge-danger">禁用</span>';
+        return '<tr>' +
+          '<td>' + e.id + '</td>' +
+          '<td>' + escapeHtml(e.username) + '</td>' +
+          '<td>' + escapeHtml(e.realName) + '</td>' +
+          '<td>' + escapeHtml(e.phone || '-') + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td><label class="switch"><input type="checkbox" data-id="' + e.id + '" data-act="status"' +
+            (e.status === 1 ? ' checked' : '') + '><span class="slider"></span></label></td>' +
+          '<td><div class="btn-group-row">' +
+          '  <button type="button" class="btn btn-sm" data-id="' + e.id + '" data-act="edit">编辑</button>' +
+          '  <button type="button" class="btn btn-sm btn-outline-danger" data-id="' + e.id + '" data-act="del">删除</button>' +
+          '</div></td>' +
+          '</tr>';
+      }).join('');
+
+      // 事件绑定：编辑 / 删除 / 启用禁用
+      tbody.querySelectorAll('[data-act]').forEach(function (el) {
+        var id = Number(el.getAttribute('data-id'));
+        var act = el.getAttribute('data-act');
+        if (act === 'edit') {
+          el.addEventListener('click', function () {
+            var row = records.find(function (r) { return r.id === id; });
+            openEdit(row);
+          });
+        } else if (act === 'del') {
+          el.addEventListener('click', function () {
+            var row = records.find(function (r) { return r.id === id; });
+            confirmDialog('确定删除员工「' + row.realName + '」吗？删除后不可恢复。').then(function (ok) {
+              if (!ok) return;
+              apiDelete('/api/admin/employees/' + id).then(function () {
+                toast('删除成功', 'success');
+                loadList();
+              }).catch(function () { });
+            });
+          });
+        } else if (act === 'status') {
+          el.addEventListener('change', function () {
+            var newStatus = el.checked ? 1 : 0;
+            apiPut('/api/admin/employees/' + id + '/status', { status: newStatus })
+              .then(function () {
+                toast(newStatus === 1 ? '已启用' : '已禁用', 'success');
+                loadList();
+              })
+              .catch(function () {
+                el.checked = !el.checked; // 失败回滚开关状态
+                loadList();
+              });
+          });
+        }
+      });
+    }
+
+    /** 打开新增弹窗 */
+    document.getElementById('addBtn').addEventListener('click', function () {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = '新增员工';
+      document.getElementById('fUsername').value = '';
+      document.getElementById('fUsername').disabled = false;
+      document.getElementById('fPassword').value = '';
+      document.getElementById('fRealName').value = '';
+      document.getElementById('fPhone').value = '';
+      document.getElementById('passwordTip').style.display = 'none';
+      openModal('editModal');
+    });
+
+    /** 打开编辑弹窗 */
+    function openEdit(row) {
+      editingId = row.id;
+      document.getElementById('modalTitle').textContent = '编辑员工';
+      document.getElementById('fUsername').value = row.username;
+      document.getElementById('fUsername').disabled = true; // 用户名不可改
+      document.getElementById('fPassword').value = '';
+      document.getElementById('fRealName').value = row.realName || '';
+      document.getElementById('fPhone').value = row.phone || '';
+      document.getElementById('passwordTip').style.display = 'block';
+      openModal('editModal');
+    }
+
+    /** 保存（新增或编辑） */
+    document.getElementById('saveBtn').addEventListener('click', function () {
+      var username = document.getElementById('fUsername').value.trim();
+      var password = document.getElementById('fPassword').value;
+      var realName = document.getElementById('fRealName').value.trim();
+      var phone = document.getElementById('fPhone').value.trim();
+
+      if (!username) { toast('请输入用户名', 'error'); return; }
+      if (editingId === null && !password) { toast('请输入密码', 'error'); return; }
+      if (!realName) { toast('请输入姓名', 'error'); return; }
+
+      var body = { username: username, realName: realName, phone: phone };
+      if (password) body.password = password;
+
+      var req = editingId === null
+        ? apiPost('/api/admin/employees', body)
+        : apiPut('/api/admin/employees/' + editingId, body);
+      req.then(function () {
+        toast(editingId === null ? '新增成功' : '修改成功', 'success');
+        closeModal('editModal');
+        loadList();
+      }).catch(function () { });
+    });
+  })();
+</script>
+</body>
+</html>

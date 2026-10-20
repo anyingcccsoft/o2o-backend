@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shangda.o2o.mapper.CategoryMapper">
+
+    <select id="findEnabled" resultType="com.shangda.o2o.entity.Category">
+        SELECT id, name, sort_order, status
+        FROM test_category
+        WHERE status = 1
+        ORDER BY sort_order ASC, id ASC
+    </select>
+</mapper>

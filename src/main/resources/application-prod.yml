@@ -1,0 +1,15 @@
+# 生产环境：MySQL 8.0（先执行 docs/sql/schema.sql 与 docs/sql/init_data.sql）
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://w-3306-sc-sit-mysql.service.testdb:3306/db_lego_erp_integration_sit?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8
+    username: lego_erp_integration_sit
+    password: i23Q(QTri&aA7og1JFkrJb9361zc24
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+  sql:
+    init:
+      mode: never
+
+

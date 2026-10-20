@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#FFECB3"/>
+  <circle cx="200" cy="128" r="72" fill="#FFFFFF" opacity="0.6"/>
+  <text x="200" y="145" font-family="Microsoft YaHei, sans-serif" font-size="34" fill="#8F6400" text-anchor="middle" font-weight="bold">扬州炒饭</text>
+  <text x="200" y="250" font-family="Microsoft YaHei, sans-serif" font-size="16" fill="#A98A3E" text-anchor="middle">O2O 外卖订餐</text>
+</svg>

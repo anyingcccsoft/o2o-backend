@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shangda.o2o.mapper.OrderMapper">
+
+    <sql id="baseColumns">
+        id, order_no, user_id, total_amount, pay_method, pay_status,
+        order_status, address_snapshot, remark, created_at, completed_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id"
+            parameterType="com.shangda.o2o.entity.Order">
+        INSERT INTO test_orders (order_no, user_id, total_amount, pay_method, pay_status,
+                            order_status, address_snapshot, remark)
+        VALUES (#{orderNo}, #{userId}, #{totalAmount}, #{payMethod}, #{payStatus},
+                #{orderStatus}, #{addressSnapshot}, #{remark})
+    </insert>
+
+    <select id="findById" resultType="com.shangda.o2o.entity.Order">
+        SELECT <include refid="baseColumns"/> FROM test_orders WHERE id = #{id}
+    </select>
+
+    <select id="findByUserIdPage" resultType="com.shangda.o2o.entity.Order">
+        SELECT <include refid="baseColumns"/> FROM test_orders
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(*) FROM test_orders WHERE user_id = #{userId}
+    </select>
+
+    <update id="updatePayStatus">
+        UPDATE test_orders SET pay_status = #{payStatus} WHERE id = #{id}
+    </update>
+
+    <update id="updateOrderStatus">
+        UPDATE test_orders SET order_status = #{orderStatus} WHERE id = #{id}
+    </update>
+</mapper>

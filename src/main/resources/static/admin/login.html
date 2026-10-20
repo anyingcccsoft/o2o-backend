@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理端登录 - 外卖订餐系统</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="login-page">
+  <div class="login-card">
+    <h1>🍱 外卖订餐系统</h1>
+    <p class="login-sub">管理端登录</p>
+    <form id="loginForm" autocomplete="off">
+      <div class="form-item">
+        <label for="username">用户名</label>
+        <input type="text" id="username" class="form-input" placeholder="请输入用户名" maxlength="50" required>
+      </div>
+      <div class="form-item">
+        <label for="password">密码</label>
+        <input type="password" id="password" class="form-input" placeholder="请输入密码" maxlength="50" required>
+      </div>
+      <!-- 登录失败错误提示 -->
+      <div class="form-error" id="loginError"></div>
+      <button type="submit" class="btn btn-primary btn-login" id="loginBtn">登 录</button>
+    </form>
+    <p class="login-footer">仅限内部员工使用</p>
+  </div>
+</div>
+
+<script src="js/admin-common.js"></script>
+<script>
+  (function () {
+    var form = document.getElementById('loginForm');
+    var errorEl = document.getElementById('loginError');
+    var loginBtn = document.getElementById('loginBtn');
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errorEl.textContent = '';
+      var username = document.getElementById('username').value.trim();
+      var password = document.getElementById('password').value;
+      if (!username || !password) {
+        errorEl.textContent = '请输入用户名和密码';
+        return;
+      }
+      loginBtn.disabled = true;
+      // silent: 登录失败以行内错误提示展示，不弹 toast
+      request('/api/admin/login', { method: 'POST', body: { username: username, password: password }, silent: true })
+        .then(function () {
+          location.href = 'index.html';
+        })
+        .catch(function (err) {
+          errorEl.textContent = err.message || '登录失败，请稍后重试';
+          loginBtn.disabled = false;
+        });
+    });
+  })();
+</script>
+</body>
+</html>

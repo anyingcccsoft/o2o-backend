@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shangda.o2o.mapper.UserMapper">
+
+    <select id="findById" resultType="com.shangda.o2o.entity.User">
+        SELECT id, username, phone, password_hash, nickname, created_at
+        FROM test_user WHERE id = #{id}
+    </select>
+
+    <select id="findByUsername" resultType="com.shangda.o2o.entity.User">
+        SELECT id, username, phone, password_hash, nickname, created_at
+        FROM test_user WHERE username = #{username}
+    </select>
+
+    <select id="findByPhone" resultType="com.shangda.o2o.entity.User">
+        SELECT id, username, phone, password_hash, nickname, created_at
+        FROM test_user WHERE phone = #{phone}
+    </select>
+
+    <select id="findByAccount" resultType="com.shangda.o2o.entity.User">
+        SELECT id, username, phone, password_hash, nickname, created_at
+        FROM test_user WHERE username = #{account} OR phone = #{account}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id"
+            parameterType="com.shangda.o2o.entity.User">
+        INSERT INTO test_user (username, phone, password_hash, nickname)
+        VALUES (#{username}, #{phone}, #{passwordHash}, #{nickname})
+    </insert>
+
+    <update id="updateInfo">
+        UPDATE test_user
+        <set>
+            <if test="nickname != null and nickname != ''">nickname = #{nickname},</if>
+            <if test="phone != null and phone != ''">phone = #{phone},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="updatePassword">
+        UPDATE test_user SET password_hash = #{passwordHash} WHERE id = #{id}
+    </update>
+</mapper>

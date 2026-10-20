@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>订单管理 - 外卖订餐管理端</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="page-title" id="pageTitle">订单管理</span>
+      <div class="topbar-right">
+        <span class="admin-name" id="adminName"></span>
+        <button type="button" class="btn btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="card">
+        <!-- 状态 Tab 筛选 -->
+        <div class="tabs" id="statusTabs">
+          <div class="tab active" data-status="">全部</div>
+          <div class="tab" data-status="0">待接单</div>
+          <div class="tab" data-status="1">制作中</div>
+          <div class="tab" data-status="2">配送中</div>
+          <div class="tab" data-status="3">已完成</div>
+          <div class="tab" data-status="4">已取消</div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>订单号</th>
+              <th>用户</th>
+              <th>金额</th>
+              <th>支付方式</th>
+              <th>支付状态</th>
+              <th>订单状态</th>
+              <th>下单时间</th>
+              <th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="tableBody">
+            <tr><td colspan="8" class="empty-cell">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 订单详情弹窗 -->
+<div class="modal-mask" id="detailModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>订单详情</h3>
+      <button type="button" class="modal-close" data-close>&times;</button>
+    </div>
+    <div class="modal-body" id="detailBody">
+      <!-- 详情内容 JS 渲染 -->
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin-common.js"></script>
+<script>
+  (function () {
+    var state = { page: 1, pageSize: 10, status: '' };
+
+    initAdminPage('orders', '订单管理').then(function () {
+      loadList();
+    }).catch(function () {});
+
+    bindModalClose();
+
+    /* ---------- Tab 切换 ---------- */
+    document.querySelectorAll('#statusTabs .tab').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        document.querySelectorAll('#statusTabs .tab').forEach(function (t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        state.status = tab.getAttribute('data-status');
+        state.page = 1;
+        loadList();
+      });
+    });
+
+    /** 加载订单分页列表 */
+    function loadList() {
+      var url = '/api/admin/orders?page=' + state.page + '&pageSize=' + state.pageSize;
+      if (state.status !== '') url += '&status=' + state.status;
+      apiGet(url).then(function (pr) {
+        renderTable(pr.records || []);
+        renderPagination('pagination', pr.total, pr.page, pr.pageSize, function (p) {
+          state.page = p;
+          loadList();
+        });
+      }).catch(function () {});
+    }
+
+    /**
+     * 按订单当前状态生成操作按钮
+     * 流转：0待接单→1制作中→2配送中→3已完成；0/1/2 可取消(→4)
+     */
+    function actionButtons(o) {
+      var btns = ['<button type="button" class="btn btn-sm" data-id="' + o.id + '" data-act="detail">详情</button>'];
+      if (o.orderStatus === 0) {
+        btns.push('<button type="button" class="btn btn-sm btn-primary" data-id="' + o.id + '" data-act="next" data-to="1">接单</button>');
+      } else if (o.orderStatus === 1) {
+        btns.push('<button type="button" class="btn btn-sm btn-primary" data-id="' + o.id + '" data-act="next" data-to="2">开始配送</button>');
+      } else if (o.orderStatus === 2) {
+        btns.push('<button type="button" class="btn btn-sm btn-success" data-id="' + o.id + '" data-act="next" data-to="3">完成订单</button>');
+      }
+      if (o.orderStatus === 0 || o.orderStatus === 1 || o.orderStatus === 2) {
+        btns.push('<button type="button" class="btn btn-sm btn-outline-danger" data-id="' + o.id + '" data-act="cancel">取消</button>');
+      }
+      return btns.join('');
+    }
+
+    /** 渲染表格 */
+    function renderTable(records) {
+      var tbody = document.getElementById('tableBody');
+      if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">暂无订单数据</td></tr>';
+        return;
+      }
+      tbody.innerHTML = records.map(function (o) {
+        var payBadge = o.payStatus === 1
+          ? '<span class="badge badge-success">已支付</span>'
+          : '<span class="badge badge-warning">待支付</span>';
+        var statusBadge = '<span class="badge ' + (ORDER_STATUS_BADGE[o.orderStatus] || 'badge-gray') + '">' +
+          (ORDER_STATUS_TEXT[o.orderStatus] || o.orderStatus) + '</span>';
+        return '<tr>' +
+          '<td>' + escapeHtml(o.orderNo) + '</td>' +
+          '<td>' + escapeHtml(o.username || '-') + '</td>' +
+          '<td class="money">' + fmtMoney(o.totalAmount) + '</td>' +
+          '<td>' + (PAY_METHOD_TEXT[o.payMethod] || '-') + '</td>' +
+          '<td>' + payBadge + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td>' + fmtTime(o.createdAt) + '</td>' +
+          '<td><div class="btn-group-row">' + actionButtons(o) + '</div></td>' +
+          '</tr>';
+      }).join('');
+
+      tbody.querySelectorAll('[data-act]').forEach(function (el) {
+        var id = Number(el.getAttribute('data-id'));
+        var act = el.getAttribute('data-act');
+        var row = records.find(function (r) { return r.id === id; });
+        if (act === 'detail') {
+          el.addEventListener('click', function () { openDetail(id); });
+        } else if (act === 'next') {
+          var to = Number(el.getAttribute('data-to'));
+          el.addEventListener('click', function () {
+            var actionName = { 1: '接单', 2: '开始配送', 3: '完成订单' }[to];
+            var tip = '确定对订单 ' + row.orderNo + ' 执行「' + actionName + '」操作吗？';
+            if (to === 1 && row.payStatus !== 1) {
+              tip += '\n注意：该订单尚未支付，接单将被后端拒绝。';
+            }
+            confirmDialog(tip).then(function (ok) {
+              if (!ok) return;
+              updateStatus(id, to);
+            });
+          });
+        } else if (act === 'cancel') {
+          el.addEventListener('click', function () {
+            confirmDialog('确定取消订单 ' + row.orderNo + ' 吗？取消后库存将回补。').then(function (ok) {
+              if (!ok) return;
+              updateStatus(id, 4);
+            });
+          });
+        }
+      });
+    }
+
+    /** 状态流转（后端校验合法性），成功后刷新列表 */
+    function updateStatus(id, status) {
+      apiPut('/api/admin/orders/' + id + '/status', { status: status }).then(function () {
+        toast('操作成功', 'success');
+        loadList();
+      }).catch(function () { });
+    }
+
+    /** 打开订单详情弹窗 */
+    function openDetail(id) {
+      apiGet('/api/admin/orders/' + id).then(function (o) {
+        var itemsRows = (o.items || []).map(function (it) {
+          return '<tr>' +
+            '<td>' + (it.dishImage
+              ? '<img class="thumb" src="' + escapeHtml(it.dishImage) + '" alt="">'
+              : '-') + '</td>' +
+            '<td>' + escapeHtml(it.dishName) + '</td>' +
+            '<td>' + fmtMoney(it.price) + '</td>' +
+            '<td>x' + it.quantity + '</td>' +
+            '<td class="money">' + fmtMoney(it.subtotal) + '</td>' +
+            '</tr>';
+        }).join('');
+
+        document.getElementById('detailBody').innerHTML =
+          '<div class="desc-list">' +
+          '  <div class="desc-row"><span class="desc-label">订单号</span><span class="desc-value">' + escapeHtml(o.orderNo) + '</span></div>' +
+          '  <div class="desc-row"><span class="desc-label">下单用户</span><span class="desc-value">' + escapeHtml(o.username || '-') + '</span></div>' +
+          '  <div class="desc-row"><span class="desc-label">订单状态</span><span class="desc-value"><span class="badge ' +
+               (ORDER_STATUS_BADGE[o.orderStatus] || 'badge-gray') + '">' + (ORDER_STATUS_TEXT[o.orderStatus] || '-') + '</span></span></div>' +
+          '  <div class="desc-row"><span class="desc-label">支付方式</span><span class="desc-value">' + (PAY_METHOD_TEXT[o.payMethod] || '-') +
+               '（' + (PAY_STATUS_TEXT[o.payStatus] || '-') + '）</span></div>' +
+          '  <div class="desc-row"><span class="desc-label">收货信息</span><span class="desc-value">' + escapeHtml(o.addressSnapshot || '-') + '</span></div>' +
+          '  <div class="desc-row"><span class="desc-label">订单备注</span><span class="desc-value">' + escapeHtml(o.remark || '无') + '</span></div>' +
+          '  <div class="desc-row"><span class="desc-label">下单时间</span><span class="desc-value">' + fmtTime(o.createdAt) + '</span></div>' +
+          '  <div class="desc-row"><span class="desc-label">完成时间</span><span class="desc-value">' + fmtTime(o.completedAt) + '</span></div>' +
+          '</div>' +
+          '<hr class="divider">' +
+          '<div class="table-wrap"><table class="table">' +
+          '  <thead><tr><th>图片</th><th>菜品</th><th>单价</th><th>数量</th><th>小计</th></tr></thead>' +
+          '  <tbody>' + (itemsRows || '<tr><td colspan="5" class="empty-cell">无明细</td></tr>') + '</tbody>' +
+          '</table></div>' +
+          '<div style="text-align:right;margin-top:12px;font-size:15px;">合计：<span class="money">' + fmtMoney(o.totalAmount) + '</span></div>';
+        openModal('detailModal');
+      }).catch(function () { });
+    }
+  })();
+</script>
+</body>
+</html>

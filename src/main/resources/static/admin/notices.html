@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公告管理 - 外卖订餐管理端</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="page-title" id="pageTitle">公告管理</span>
+      <div class="topbar-right">
+        <span class="admin-name" id="adminName"></span>
+        <button type="button" class="btn btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="card">
+        <div class="card-header">
+          <h3>公告列表</h3>
+          <button type="button" class="btn btn-primary" id="addBtn">+ 新增公告</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>ID</th>
+              <th>标题</th>
+              <th>内容</th>
+              <th>状态</th>
+              <th>发布时间</th>
+              <th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="tableBody">
+            <tr><td colspan="6" class="empty-cell">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑公告弹窗 -->
+<div class="modal-mask" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">新增公告</h3>
+      <button type="button" class="modal-close" data-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editForm" autocomplete="off">
+        <div class="form-item">
+          <label><span class="required">*</span>公告标题</label>
+          <input type="text" id="fTitle" class="form-input" placeholder="公告标题" maxlength="50">
+        </div>
+        <div class="form-item">
+          <label><span class="required">*</span>公告内容</label>
+          <textarea id="fContent" class="form-textarea" placeholder="公告内容" maxlength="500"></textarea>
+        </div>
+        <div class="form-item">
+          <label>状态</label>
+          <select id="fStatus" class="form-select">
+            <option value="1">发布</option>
+            <option value="0">下线</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" data-close>取消</button>
+      <button type="button" class="btn btn-primary" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin-common.js"></script>
+<script>
+  (function () {
+    var editingId = null; // null=新增
+
+    initAdminPage('notices', '公告管理').then(function () {
+      loadList();
+    }).catch(function () {});
+
+    bindModalClose();
+
+    /** 加载公告列表（全量，无分页） */
+    function loadList() {
+      apiGet('/api/admin/notices').then(function (list) {
+        renderTable(list || []);
+      }).catch(function () {});
+    }
+
+    /** 内容超长截断展示 */
+    function truncate(str, len) {
+      str = str || '';
+      return str.length > len ? str.slice(0, len) + '…' : str;
+    }
+
+    /** 渲染表格 */
+    function renderTable(list) {
+      var tbody = document.getElementById('tableBody');
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">暂无公告数据</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(function (n) {
+        var statusBadge = n.status === 1
+          ? '<span class="badge badge-success">发布中</span>'
+          : '<span class="badge badge-gray">已下线</span>';
+        return '<tr>' +
+          '<td>' + n.id + '</td>' +
+          '<td>' + escapeHtml(n.title) + '</td>' +
+          '<td>' + escapeHtml(truncate(n.content, 40)) + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td>' + fmtTime(n.createdAt) + '</td>' +
+          '<td><div class="btn-group-row">' +
+          '  <button type="button" class="btn btn-sm" data-id="' + n.id + '" data-act="edit">编辑</button>' +
+          '  <button type="button" class="btn btn-sm btn-outline-danger" data-id="' + n.id + '" data-act="del">删除</button>' +
+          '</div></td>' +
+          '</tr>';
+      }).join('');
+
+      tbody.querySelectorAll('[data-act]').forEach(function (el) {
+        var id = Number(el.getAttribute('data-id'));
+        var row = list.find(function (r) { return r.id === id; });
+        if (el.getAttribute('data-act') === 'edit') {
+          el.addEventListener('click', function () { openEdit(row); });
+        } else {
+          el.addEventListener('click', function () {
+            confirmDialog('确定删除公告「' + row.title + '」吗？').then(function (ok) {
+              if (!ok) return;
+              apiDelete('/api/admin/notices/' + id).then(function () {
+                toast('删除成功', 'success');
+                loadList();
+              }).catch(function () { });
+            });
+          });
+        }
+      });
+    }
+
+    /** 打开新增弹窗 */
+    document.getElementById('addBtn').addEventListener('click', function () {
+      editingId = null;
+      document.getElementById('modalTitle').textContent = '新增公告';
+      document.getElementById('fTitle').value = '';
+      document.getElementById('fContent').value = '';
+      document.getElementById('fStatus').value = '1';
+      openModal('editModal');
+    });
+
+    /** 打开编辑弹窗 */
+    function openEdit(row) {
+      editingId = row.id;
+      document.getElementById('modalTitle').textContent = '编辑公告';
+      document.getElementById('fTitle').value = row.title;
+      document.getElementById('fContent').value = row.content || '';
+      document.getElementById('fStatus').value = String(row.status);
+      openModal('editModal');
+    }
+
+    /** 保存 */
+    document.getElementById('saveBtn').addEventListener('click', function () {
+      var title = document.getElementById('fTitle').value.trim();
+      var content = document.getElementById('fContent').value.trim();
+      if (!title) { toast('请输入公告标题', 'error'); return; }
+      if (!content) { toast('请输入公告内容', 'error'); return; }
+      var body = {
+        title: title,
+        content: content,
+        status: parseInt(document.getElementById('fStatus').value, 10)
+      };
+      var req = editingId === null
+        ? apiPost('/api/admin/notices', body)
+        : apiPut('/api/admin/notices/' + editingId, body);
+      req.then(function () {
+        toast(editingId === null ? '新增成功' : '修改成功', 'success');
+        closeModal('editModal');
+        loadList();
+      }).catch(function () { });
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统概览 - 外卖订餐管理端</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="layout">
+  <!-- 侧边栏由 admin-common.js 渲染 -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="page-title" id="pageTitle">系统概览</span>
+      <div class="topbar-right">
+        <span class="admin-name" id="adminName"></span>
+        <button type="button" class="btn btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- 欢迎横幅 -->
+      <div class="welcome-banner">
+        <h2 id="welcomeTitle">欢迎回来！</h2>
+        <p id="welcomeTime"></p>
+      </div>
+
+      <!-- 订单状态统计 -->
+      <div class="card">
+        <div class="card-header"><h3>订单概况</h3></div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">全部订单</div>
+            <div class="stat-value" id="statOrderAll">-</div>
+          </div>
+          <div class="stat-card stat-orange">
+            <div class="stat-label">待接单</div>
+            <div class="stat-value" id="statOrder0">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">制作中</div>
+            <div class="stat-value" id="statOrder1">-</div>
+          </div>
+          <div class="stat-card stat-purple">
+            <div class="stat-label">配送中</div>
+            <div class="stat-value" id="statOrder2">-</div>
+          </div>
+          <div class="stat-card stat-green">
+            <div class="stat-label">已完成</div>
+            <div class="stat-value" id="statOrder3">-</div>
+          </div>
+          <div class="stat-card stat-gray">
+            <div class="stat-label">已取消</div>
+            <div class="stat-value" id="statOrder4">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 基础数据统计 -->
+      <div class="card">
+        <div class="card-header"><h3>基础数据</h3></div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">菜品总数</div>
+            <div class="stat-value" id="statDish">-</div>
+          </div>
+          <div class="stat-card stat-green">
+            <div class="stat-label">员工总数</div>
+            <div class="stat-value" id="statEmployee">-</div>
+          </div>
+          <div class="stat-card stat-orange">
+            <div class="stat-label">分类总数</div>
+            <div class="stat-value" id="statCategory">-</div>
+          </div>
+          <div class="stat-card stat-purple">
+            <div class="stat-label">在线公告</div>
+            <div class="stat-value" id="statNotice">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin-common.js"></script>
+<script>
+  (function () {
+    // 会话校验 + 布局初始化，然后加载各项统计
+    initAdminPage('index', '系统概览').then(function (info) {
+      document.getElementById('welcomeTitle').textContent =
+        '欢迎回来，' + (info.realName || info.username) + '！';
+      document.getElementById('welcomeTime').textContent = '今天是 ' + fmtTime(new Date()) + '，祝您工作顺利。';
+      loadStats();
+    }).catch(function () { /* 401 已由 request 统一跳转 */ });
+
+    /** 设置统计卡片值 */
+    function setStat(id, value) {
+      document.getElementById(id).textContent = value;
+    }
+
+    /** 加载全部统计数据：借助各列表接口的 total（pageSize=1 减小数据量） */
+    function loadStats() {
+      // 全部订单 + 各状态订单数
+      apiGet('/api/admin/orders?page=1&pageSize=1')
+        .then(function (pr) { setStat('statOrderAll', pr.total); }).catch(function () {});
+      [0, 1, 2, 3, 4].forEach(function (status) {
+        apiGet('/api/admin/orders?status=' + status + '&page=1&pageSize=1')
+          .then(function (pr) { setStat('statOrder' + status, pr.total); }).catch(function () {});
+      });
+      // 菜品总数
+      apiGet('/api/admin/dishes?page=1&pageSize=1')
+        .then(function (pr) { setStat('statDish', pr.total); }).catch(function () {});
+      // 员工总数
+      apiGet('/api/admin/employees?page=1&pageSize=1')
+        .then(function (pr) { setStat('statEmployee', pr.total); }).catch(function () {});
+      // 分类 / 公告为全量列表接口，取数组长度
+      apiGet('/api/admin/categories')
+        .then(function (list) { setStat('statCategory', list.length); }).catch(function () {});
+      apiGet('/api/admin/notices')
+        .then(function (list) {
+          var online = list.filter(function (n) { return n.status === 1; }).length;
+          setStat('statNotice', online);
+        }).catch(function () {});
+    }
+  })();
+</script>
+</body>
+</html>

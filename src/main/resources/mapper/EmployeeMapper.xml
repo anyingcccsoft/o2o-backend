@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shangda.o2o.mapper.EmployeeMapper">
+
+    <select id="findByUsername" resultType="com.shangda.o2o.entity.Employee">
+        SELECT id, username, password_hash, real_name, phone, status
+        FROM test_employee
+        WHERE username = #{username}
+    </select>
+
+    <select id="findById" resultType="com.shangda.o2o.entity.Employee">
+        SELECT id, username, password_hash, real_name, phone, status
+        FROM test_employee
+        WHERE id = #{id}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM test_employee
+    </select>
+
+    <!-- 分页查询不返回密码字段 -->
+    <select id="findPage" resultType="com.shangda.o2o.dto.admin.EmployeeVO">
+        SELECT id, username, real_name, phone, status
+        FROM test_employee
+        ORDER BY id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <insert id="insert" parameterType="com.shangda.o2o.entity.Employee"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO test_employee (username, password_hash, real_name, phone, status)
+        VALUES (#{username}, #{passwordHash}, #{realName}, #{phone}, #{status})
+    </insert>
+
+    <!-- 编辑姓名/电话，passwordHash 非空时同步重置密码 -->
+    <update id="update" parameterType="com.shangda.o2o.entity.Employee">
+        UPDATE test_employee
+        <set>
+            real_name = #{realName},
+            phone = #{phone},
+            <if test="passwordHash != null and passwordHash != ''">
+                password_hash = #{passwordHash},
+            </if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM test_employee WHERE id = #{id}
+    </delete>
+
+    <update id="updateStatus">
+        UPDATE test_employee SET status = #{status} WHERE id = #{id}
+    </update>
+</mapper>

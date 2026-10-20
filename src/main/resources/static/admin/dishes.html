@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>菜品管理 - 外卖订餐管理端</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="page-title" id="pageTitle">菜品管理</span>
+      <div class="topbar-right">
+        <span class="admin-name" id="adminName"></span>
+        <button type="button" class="btn btn-sm" id="logoutBtn">退出登录</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- 筛选栏 -->
+      <div class="card">
+        <div class="filter-bar">
+          <select id="filterCategory" class="form-select">
+            <option value="">全部分类</option>
+          </select>
+          <input type="text" id="filterKeyword" class="form-input" placeholder="按菜品名称搜索" maxlength="30">
+          <button type="button" class="btn btn-primary" id="searchBtn">搜索</button>
+          <button type="button" class="btn" id="resetBtn">重置</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>菜品列表</h3>
+          <button type="button" class="btn btn-primary" id="addBtn">+ 新增菜品</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>图片</th>
+              <th>名称</th>
+              <th>分类</th>
+              <th>价格</th>
+              <th>库存</th>
+              <th>销量</th>
+              <th>状态</th>
+              <th>上/下架</th>
+              <th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="tableBody">
+            <tr><td colspan="9" class="empty-cell">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑菜品弹窗 -->
+<div class="modal-mask" id="editModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="modalTitle">新增菜品</h3>
+      <button type="button" class="modal-close" data-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editForm" autocomplete="off">
+        <div class="form-row">
+          <div class="form-item">
+            <label><span class="required">*</span>菜品名称</label>
+            <input type="text" id="fName" class="form-input" placeholder="菜品名称" maxlength="50">
+          </div>
+          <div class="form-item">
+            <label><span class="required">*</span>所属分类</label>
+            <select id="fCategoryId" class="form-select"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-item">
+            <label><span class="required">*</span>价格（元）</label>
+            <input type="number" id="fPrice" class="form-input" placeholder="如 18.00" min="0" step="0.01">
+          </div>
+          <div class="form-item">
+            <label><span class="required">*</span>库存</label>
+            <input type="number" id="fStock" class="form-input" placeholder="库存数量" min="0" step="1">
+          </div>
+        </div>
+        <div class="form-item">
+          <label>菜品图片</label>
+          <div class="upload-box">
+            <div class="upload-preview" id="imagePreview">暂无图片</div>
+            <div>
+              <input type="file" id="fImageFile" accept="image/*" style="display:none;">
+              <button type="button" class="btn" id="uploadBtn">选择图片上传</button>
+              <div class="form-tip">支持 jpg/png/gif/svg/webp，不超过 10MB</div>
+            </div>
+          </div>
+        </div>
+        <div class="form-item">
+          <label>菜品描述</label>
+          <textarea id="fDescription" class="form-textarea" placeholder="口味、食材等简介" maxlength="200"></textarea>
+        </div>
+        <div class="form-item">
+          <label>状态</label>
+          <select id="fStatus" class="form-select">
+            <option value="1">上架</option>
+            <option value="0">下架</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" data-close>取消</button>
+      <button type="button" class="btn btn-primary" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 库存调整弹窗 -->
+<div class="modal-mask" id="stockModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>库存调整</h3>
+      <button type="button" class="modal-close" data-close>&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="desc-list" style="margin-bottom:12px;">
+        <div class="desc-row"><span class="desc-label">菜品</span><span class="desc-value" id="stockDishName">-</span></div>
+        <div class="desc-row"><span class="desc-label">当前库存</span><span class="desc-value" id="stockCurrent">-</span></div>
+      </div>
+      <!-- 调整方式二选一：增减量 / 目标库存 -->
+      <div class="form-item">
+        <label>调整方式</label>
+        <select id="stockMode" class="form-select">
+          <option value="delta">按增减量调整（正数入库、负数出库）</option>
+          <option value="target">设置目标库存</option>
+        </select>
+      </div>
+      <div class="form-item" id="deltaItem">
+        <label>增减量</label>
+        <input type="number" id="fDelta" class="form-input" placeholder="如 10 或 -5" step="1">
+      </div>
+      <div class="form-item" id="targetItem" style="display:none;">
+        <label>目标库存</label>
+        <input type="number" id="fTarget" class="form-input" placeholder="调整后的库存数量" min="0" step="1">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" data-close>取消</button>
+      <button type="button" class="btn btn-primary" id="stockSaveBtn">确定调整</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin-common.js"></script>
+<script>
+  (function () {
+    var state = { page: 1, pageSize: 10, categoryId: '', keyword: '' };
+    var categories = [];       // 分类缓存（下拉共用）
+    var editingId = null;      // null=新增
+    var uploadedImageUrl = ''; // 弹窗中已上传/已有的图片地址
+    var stockDishId = null;    // 库存调整目标菜品
+
+    initAdminPage('dishes', '菜品管理').then(function () {
+      // 先加载分类填充两个下拉，再加载菜品列表
+      apiGet('/api/admin/categories').then(function (list) {
+        categories = list || [];
+        fillCategorySelects();
+        loadList();
+      }).catch(function () { loadList(); });
+    }).catch(function () {});
+
+    bindModalClose();
+
+    /** 填充筛选栏与编辑弹窗的分类下拉 */
+    function fillCategorySelects() {
+      var options = categories.map(function (c) {
+        return '<option value="' + c.id + '">' + escapeHtml(c.name) + '</option>';
+      }).join('');
+      document.getElementById('filterCategory').innerHTML = '<option value="">全部分类</option>' + options;
+      document.getElementById('fCategoryId').innerHTML = options;
+    }
+
+    /** 根据分类 id 取名称 */
+    function categoryName(id) {
+      var c = categories.find(function (x) { return x.id === id; });
+      return c ? c.name : '-';
+    }
+
+    /** 加载菜品分页列表 */
+    function loadList() {
+      var url = '/api/admin/dishes?page=' + state.page + '&pageSize=' + state.pageSize;
+      if (state.categoryId) url += '&categoryId=' + state.categoryId;
+      if (state.keyword) url += '&keyword=' + encodeURIComponent(state.keyword);
+      apiGet(url).then(function (pr) {
+        renderTable(pr.records || []);
+        renderPagination('pagination', pr.total, pr.page, pr.pageSize, function (p) {
+          state.page = p;
+          loadList();
+        });
+      }).catch(function () {});
+    }
+
+    /** 渲染表格 */
+    function renderTable(records) {
+      var tbody = document.getElementById('tableBody');
+      if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-cell">暂无菜品数据</td></tr>';
+        return;
+      }
+      tbody.innerHTML = records.map(function (d) {
+        var img = d.imageUrl
+          ? '<img class="thumb" src="' + escapeHtml(d.imageUrl) + '" alt="' + escapeHtml(d.name) + '">'
+          : '<span class="badge badge-gray">无图</span>';
+        var statusBadge = d.status === 1
+          ? '<span class="badge badge-success">上架</span>'
+          : '<span class="badge badge-gray">下架</span>';
+        var stockCell = d.stock <= 5
+          ? '<span class="money">' + d.stock + '</span>'
+          : String(d.stock);
+        return '<tr>' +
+          '<td>' + img + '</td>' +
+          '<td>' + escapeHtml(d.name) + '</td>' +
+          '<td>' + escapeHtml(categoryName(d.categoryId)) + '</td>' +
+          '<td>' + fmtMoney(d.price) + '</td>' +
+          '<td>' + stockCell + '</td>' +
+          '<td>' + (d.sales != null ? d.sales : 0) + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td><label class="switch"><input type="checkbox" data-id="' + d.id + '" data-act="status"' +
+            (d.status === 1 ? ' checked' : '') + '><span class="slider"></span></label></td>' +
+          '<td><div class="btn-group-row">' +
+          '  <button type="button" class="btn btn-sm" data-id="' + d.id + '" data-act="edit">编辑</button>' +
+          '  <button type="button" class="btn btn-sm" data-id="' + d.id + '" data-act="stock">库存</button>' +
+          '  <button type="button" class="btn btn-sm btn-outline-danger" data-id="' + d.id + '" data-act="del">删除</button>' +
+          '</div></td>' +
+          '</tr>';
+      }).join('');
+
+      tbody.querySelectorAll('[data-act]').forEach(function (el) {
+        var id = Number(el.getAttribute('data-id'));
+        var act = el.getAttribute('data-act');
+        var row = records.find(function (r) { return r.id === id; });
+        if (act === 'edit') {
+          el.addEventListener('click', function () { openEdit(row); });
+        } else if (act === 'stock') {
+          el.addEventListener('click', function () { openStock(row); });
+        } else if (act === 'del') {
+          el.addEventListener('click', function () {
+            confirmDialog('确定删除菜品「' + row.name + '」吗？删除后不可恢复。').then(function (ok) {
+              if (!ok) return;
+              apiDelete('/api/admin/dishes/' + id).then(function () {
+                toast('删除成功', 'success');
+                loadList();
+              }).catch(function () { });
+            });
+          });
+        } else if (act === 'status') {
+          // 上下架切换
+          el.addEventListener('change', function () {
+            var newStatus = el.checked ? 1 : 0;
+            apiPut('/api/admin/dishes/' + id + '/status', { status: newStatus })
+              .then(function () {
+                toast(newStatus === 1 ? '已上架' : '已下架', 'success');
+                loadList();
+              })
+              .catch(function () {
+                el.checked = !el.checked;
+                loadList();
+              });
+          });
+        }
+      });
+    }
+
+    /* ---------- 筛选 ---------- */
+    document.getElementById('searchBtn').addEventListener('click', doSearch);
+    document.getElementById('filterKeyword').addEventListener('keyup', function (e) {
+      if (e.key === 'Enter') doSearch();
+    });
+    document.getElementById('resetBtn').addEventListener('click', function () {
+      document.getElementById('filterCategory').value = '';
+      document.getElementById('filterKeyword').value = '';
+      doSearch();
+    });
+
+    function doSearch() {
+      state.categoryId = document.getElementById('filterCategory').value;
+      state.keyword = document.getElementById('filterKeyword').value.trim();
+      state.page = 1;
+      loadList();
+    }
+
+    /* ---------- 新增 / 编辑弹窗 ---------- */
+    document.getElementById('addBtn').addEventListener('click', function () {
+      if (categories.length === 0) { toast('请先创建菜品分类', 'error'); return; }
+      editingId = null;
+      uploadedImageUrl = '';
+      document.getElementById('modalTitle').textContent = '新增菜品';
+      document.getElementById('fName').value = '';
+      document.getElementById('fCategoryId').value = String(categories[0].id);
+      document.getElementById('fPrice').value = '';
+      document.getElementById('fStock').value = '';
+      document.getElementById('fDescription').value = '';
+      document.getElementById('fStatus').value = '1';
+      renderPreview('');
+      openModal('editModal');
+    });
+
+    function openEdit(row) {
+      editingId = row.id;
+      uploadedImageUrl = row.imageUrl || '';
+      document.getElementById('modalTitle').textContent = '编辑菜品';
+      document.getElementById('fName').value = row.name;
+      document.getElementById('fCategoryId').value = String(row.categoryId);
+      document.getElementById('fPrice').value = row.price;
+      document.getElementById('fStock').value = row.stock;
+      document.getElementById('fDescription').value = row.description || '';
+      document.getElementById('fStatus').value = String(row.status);
+      renderPreview(uploadedImageUrl);
+      openModal('editModal');
+    }
+
+    /** 渲染图片预览 */
+    function renderPreview(url) {
+      var box = document.getElementById('imagePreview');
+      box.innerHTML = url ? '<img src="' + escapeHtml(url) + '" alt="预览">' : '暂无图片';
+    }
+
+    /* ---------- 图片上传 ---------- */
+    document.getElementById('uploadBtn').addEventListener('click', function () {
+      document.getElementById('fImageFile').click();
+    });
+    document.getElementById('fImageFile').addEventListener('change', function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      var fd = new FormData();
+      fd.append('file', file);
+      request('/api/admin/upload', { method: 'POST', rawBody: fd })
+        .then(function (data) {
+          uploadedImageUrl = data.url;
+          renderPreview(uploadedImageUrl);
+          toast('上传成功', 'success');
+        })
+        .catch(function () { });
+      this.value = ''; // 允许重复选择同一文件
+    });
+
+    /* ---------- 保存 ---------- */
+    document.getElementById('saveBtn').addEventListener('click', function () {
+      var name = document.getElementById('fName').value.trim();
+      var categoryId = document.getElementById('fCategoryId').value;
+      var price = document.getElementById('fPrice').value;
+      var stock = document.getElementById('fStock').value;
+
+      if (!name) { toast('请输入菜品名称', 'error'); return; }
+      if (!categoryId) { toast('请选择所属分类', 'error'); return; }
+      if (price === '' || Number(price) < 0) { toast('请输入正确的价格', 'error'); return; }
+      if (stock === '' || parseInt(stock, 10) < 0) { toast('请输入正确的库存', 'error'); return; }
+
+      var body = {
+        name: name,
+        categoryId: Number(categoryId),
+        price: Number(price),
+        description: document.getElementById('fDescription').value.trim(),
+        imageUrl: uploadedImageUrl,
+        stock: parseInt(stock, 10),
+        status: parseInt(document.getElementById('fStatus').value, 10)
+      };
+      var req = editingId === null
+        ? apiPost('/api/admin/dishes', body)
+        : apiPut('/api/admin/dishes/' + editingId, body);
+      req.then(function () {
+        toast(editingId === null ? '新增成功' : '修改成功', 'success');
+        closeModal('editModal');
+        loadList();
+      }).catch(function () { });
+    });
+
+    /* ---------- 库存调整 ---------- */
+    // 切换调整方式时显示对应输入框
+    document.getElementById('stockMode').addEventListener('change', function () {
+      var isDelta = this.value === 'delta';
+      document.getElementById('deltaItem').style.display = isDelta ? '' : 'none';
+      document.getElementById('targetItem').style.display = isDelta ? 'none' : '';
+    });
+
+    function openStock(row) {
+      stockDishId = row.id;
+      document.getElementById('stockDishName').textContent = row.name;
+      document.getElementById('stockCurrent').textContent = row.stock;
+      document.getElementById('stockMode').value = 'delta';
+      document.getElementById('deltaItem').style.display = '';
+      document.getElementById('targetItem').style.display = 'none';
+      document.getElementById('fDelta').value = '';
+      document.getElementById('fTarget').value = '';
+      openModal('stockModal');
+    }
+
+    document.getElementById('stockSaveBtn').addEventListener('click', function () {
+      var mode = document.getElementById('stockMode').value;
+      var body = {};
+      if (mode === 'delta') {
+        var delta = document.getElementById('fDelta').value;
+        if (delta === '' || parseInt(delta, 10) === 0 || isNaN(parseInt(delta, 10))) {
+          toast('请输入非零的增减量', 'error');
+          return;
+        }
+        body.quantityDelta = parseInt(delta, 10);
+      } else {
+        var target = document.getElementById('fTarget').value;
+        if (target === '' || parseInt(target, 10) < 0 || isNaN(parseInt(target, 10))) {
+          toast('请输入正确的目标库存', 'error');
+          return;
+        }
+        body.targetStock = parseInt(target, 10);
+      }
+      apiPut('/api/admin/dishes/' + stockDishId + '/stock', body).then(function (data) {
+        toast('库存调整成功，当前库存 ' + data.stock, 'success');
+        closeModal('stockModal');
+        loadList();
+      }).catch(function () { });
+    });
+  })();
+</script>
+</body>
+</html>

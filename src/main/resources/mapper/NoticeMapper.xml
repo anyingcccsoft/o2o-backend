@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.shangda.o2o.mapper.NoticeMapper">
+
+    <select id="findPublished" resultType="com.shangda.o2o.entity.Notice">
+        SELECT id, title, content, status, created_at
+        FROM test_notice
+        WHERE status = 1
+        ORDER BY created_at DESC, id DESC
+    </select>
+</mapper>
